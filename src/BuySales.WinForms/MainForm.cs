@@ -372,7 +372,8 @@ public class MainForm : Form
         _transactionsGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         _transactionsGrid.ColumnHeadersHeight = 56;
         _transactionsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        _transactionsGrid.SelectionChanged += (_, _) => LoadSelectedTransaction();
+        _transactionsGrid.CellClick += (_, _) => LoadSelectedTransaction();
+        _transactionsGrid.DataBindingComplete += (_, _) => ClearGridSelection();
 
         _transactionsGrid.Columns.Add(CreateTextColumn("TransactionDate", "날짜", 110));
         _transactionsGrid.Columns.Add(CreateTextColumn("DisplayKind", "구분", 80));
@@ -695,12 +696,7 @@ public class MainForm : Form
     {
         _selectedTransaction = null;
         _datePicker.Value = DateTime.Today;
-        _purchaseRadio.Checked = true;
-        _itemNameTextBox.Clear();
-        _unitPriceInput.Value = 0;
-        _quantityInput.Value = 1;
-        _memoTextBox.Clear();
-        UpdateAmount();
+        ResetInputForNewTransaction();
         _saveButton.Text = "저장";
         _deleteButton.Enabled = false;
         ClearGridSelection();
@@ -747,6 +743,7 @@ public class MainForm : Form
         _transactionsGrid.DataSource = transactions;
         ClearGridSelection();
         _selectedTransaction = null;
+        ResetInputForNewTransaction();
         _saveButton.Text = "저장";
         _deleteButton.Enabled = false;
         _isLoading = false;
@@ -761,6 +758,19 @@ public class MainForm : Form
     {
         _transactionsGrid.ClearSelection();
         _transactionsGrid.CurrentCell = null;
+    }
+
+    /// <summary>
+    /// 선택 날짜는 유지하면서 새 입력 상태로 입력값을 초기화합니다.
+    /// </summary>
+    private void ResetInputForNewTransaction()
+    {
+        _purchaseRadio.Checked = true;
+        _itemNameTextBox.Clear();
+        _unitPriceInput.Value = 0;
+        _quantityInput.Value = 1;
+        _memoTextBox.Clear();
+        UpdateAmount();
     }
 
     /// <summary>
