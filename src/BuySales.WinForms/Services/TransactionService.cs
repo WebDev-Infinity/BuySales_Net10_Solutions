@@ -39,6 +39,20 @@ public class TransactionService
     }
 
     /// <summary>
+    /// 지정한 일자의 거래 목록을 조회합니다.
+    /// </summary>
+    /// <param name="date">조회할 날짜입니다.</param>
+    /// <returns>거래 목록입니다.</returns>
+    public async Task<List<BuySaleTransaction>> GetDailyTransactionsAsync(DateOnly date)
+    {
+        using var context = _contextFactory.CreateDbContext();
+        return await context.Transactions
+            .Where(x => x.TransactionDate == date)
+            .OrderByDescending(x => x.Id)
+            .ToListAsync();
+    }
+
+    /// <summary>
     /// 거래를 새로 저장하거나 기존 거래를 수정합니다.
     /// </summary>
     /// <param name="transaction">저장할 거래입니다.</param>

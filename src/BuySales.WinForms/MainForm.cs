@@ -2,6 +2,7 @@ using BuySales.WinForms.Data;
 using BuySales.WinForms.Models;
 using BuySales.WinForms.Services;
 using BuySales.WinForms.Theme;
+using System.Text;
 
 namespace BuySales.WinForms;
 
@@ -37,6 +38,8 @@ public class MainForm : Form
     private readonly Button _saveButton = new();
     private readonly Button _newButton = new();
     private readonly Button _deleteButton = new();
+    private readonly Button _dailyExportButton = new();
+    private readonly Button _monthlyExportButton = new();
     private readonly Button _themeButton = new();
 
     /// <summary>
@@ -62,6 +65,7 @@ public class MainForm : Form
     {
         Text = "매입/매출 금액 관리";
         StartPosition = FormStartPosition.CenterScreen;
+        WindowState = FormWindowState.Maximized;
         MinimumSize = new Size(1220, 780);
         Size = new Size(1380, 860);
         Font = new Font("Malgun Gothic", 12.5F, FontStyle.Regular, GraphicsUnit.Point);
@@ -97,7 +101,7 @@ public class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 13,
+            RowCount = 15,
             Padding = new Padding(14),
             Margin = new Padding(0, 0, 16, 0)
         };
@@ -110,9 +114,11 @@ public class MainForm : Form
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 88));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
 
@@ -125,7 +131,7 @@ public class MainForm : Form
         };
 
         _datePicker.Format = DateTimePickerFormat.Short;
-        _datePicker.ValueChanged += async (_, _) => await RefreshSummariesFromInputDateAsync();
+        _datePicker.ValueChanged += async (_, _) => await ReloadAsync();
 
         _purchaseRadio.Text = "매입";
         _purchaseRadio.Checked = true;
@@ -170,6 +176,14 @@ public class MainForm : Form
         _deleteButton.Dock = DockStyle.Fill;
         _deleteButton.Click += async (_, _) => await DeleteAsync();
 
+        _dailyExportButton.Text = "일별 엑셀";
+        _dailyExportButton.Dock = DockStyle.Fill;
+        _dailyExportButton.Click += async (_, _) => await ExportDailyAsync();
+
+        _monthlyExportButton.Text = "월별 엑셀";
+        _monthlyExportButton.Dock = DockStyle.Fill;
+        _monthlyExportButton.Click += async (_, _) => await ExportMonthlyAsync();
+
         _themeButton.Dock = DockStyle.Fill;
         _themeButton.Click += (_, _) => ToggleTheme();
 
@@ -184,8 +198,10 @@ public class MainForm : Form
         sidebar.Controls.Add(_saveButton, 0, 8);
         sidebar.Controls.Add(_newButton, 0, 9);
         sidebar.Controls.Add(_deleteButton, 0, 10);
-        sidebar.Controls.Add(CreateDatabaseInfo(), 0, 11);
-        sidebar.Controls.Add(_themeButton, 0, 12);
+        sidebar.Controls.Add(_dailyExportButton, 0, 11);
+        sidebar.Controls.Add(_monthlyExportButton, 0, 12);
+        sidebar.Controls.Add(CreateDatabaseInfo(), 0, 13);
+        sidebar.Controls.Add(_themeButton, 0, 14);
 
         return sidebar;
     }
@@ -225,7 +241,7 @@ public class MainForm : Form
             RowCount = 4
         };
 
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 86));
+        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 90));
         content.RowStyles.Add(new RowStyle(SizeType.Absolute, 144));
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         content.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
@@ -265,10 +281,10 @@ public class MainForm : Form
         _monthPicker.Format = DateTimePickerFormat.Custom;
         _monthPicker.CustomFormat = "yyyy년 MM월";
         _monthPicker.ShowUpDown = true;
-        _monthPicker.ValueChanged += async (_, _) => await ReloadAsync();
+        _monthPicker.ValueChanged += async (_, _) => await UpdateSummariesAsync();
 
         header.Controls.Add(title, 0, 0);
-        header.Controls.Add(CreateLabeledControl("조회 월", _monthPicker), 1, 0);
+        header.Controls.Add(CreateLabeledControl("월별 합계", _monthPicker), 1, 0);
 
         return header;
     }
@@ -354,7 +370,9 @@ public class MainForm : Form
         _transactionsGrid.MultiSelect = false;
         _transactionsGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         _transactionsGrid.RowHeadersVisible = false;
-        _transactionsGrid.RowTemplate.Height = 38;
+        _transactionsGrid.RowTemplate.Height = 40;
+        _transactionsGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+        _transactionsGrid.ColumnHeadersHeight = 42;
         _transactionsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         _transactionsGrid.SelectionChanged += (_, _) => LoadSelectedTransaction();
 
@@ -414,6 +432,96 @@ public class MainForm : Form
     }
 
     /// <summary>
+    /// 선택한 날짜의 거래 목록을 엑셀에서 열 수 있는 CSV 파일로 내보냅니다.
+    /// </summary>
+    /// <returns>비동기 작업입니다.</returns>
+    private async Task ExportDailyAsync()
+    {
+        var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
+        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
+        await ExportTransactionsAsync(transactions, $"일별_{selectedDate:yyyyMMdd}");
+    }
+
+    /// <summary>
+    /// 선택한 월의 거래 목록을 엑셀에서 열 수 있는 CSV 파일로 내보냅니다.
+    /// </summary>
+    /// <returns>비동기 작업입니다.</returns>
+    private async Task ExportMonthlyAsync()
+    {
+        var selectedMonth = DateOnly.FromDateTime(_monthPicker.Value);
+        var transactions = await _transactionService.GetMonthlyTransactionsAsync(selectedMonth);
+        await ExportTransactionsAsync(transactions, $"월별_{selectedMonth:yyyyMM}");
+    }
+
+    /// <summary>
+    /// 거래 목록을 사용자가 선택한 CSV 파일로 저장합니다.
+    /// </summary>
+    /// <param name="transactions">내보낼 거래 목록입니다.</param>
+    /// <param name="fileNamePrefix">기본 파일명 접두사입니다.</param>
+    /// <returns>비동기 작업입니다.</returns>
+    private async Task ExportTransactionsAsync(IReadOnlyCollection<BuySaleTransaction> transactions, string fileNamePrefix)
+    {
+        if (transactions.Count == 0)
+        {
+            MessageBox.Show("내보낼 거래 내역이 없습니다.", "엑셀 내보내기", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var dialog = new SaveFileDialog
+        {
+            Title = "엑셀 내보내기",
+            Filter = "Excel CSV 파일 (*.csv)|*.csv",
+            FileName = $"매입매출_{fileNamePrefix}.csv",
+            AddExtension = true,
+            DefaultExt = "csv"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        await WriteTransactionsCsvAsync(dialog.FileName, transactions);
+        MessageBox.Show("엑셀 파일로 내보냈습니다.", "엑셀 내보내기", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    /// <summary>
+    /// 거래 목록을 UTF-8 BOM CSV 파일로 저장합니다.
+    /// </summary>
+    /// <param name="filePath">저장할 파일 경로입니다.</param>
+    /// <param name="transactions">저장할 거래 목록입니다.</param>
+    /// <returns>비동기 작업입니다.</returns>
+    private static async Task WriteTransactionsCsvAsync(string filePath, IEnumerable<BuySaleTransaction> transactions)
+    {
+        await using var writer = new StreamWriter(filePath, false, new UTF8Encoding(true));
+        await writer.WriteLineAsync("날짜,구분,품목,단가,수량,금액,메모");
+
+        foreach (var transaction in transactions)
+        {
+            var line = string.Join(",",
+                EscapeCsv(transaction.TransactionDate.ToString("yyyy-MM-dd")),
+                EscapeCsv(transaction.DisplayKind),
+                EscapeCsv(transaction.ItemName),
+                EscapeCsv(transaction.UnitPrice.ToString("0.##")),
+                EscapeCsv(decimal.Truncate(transaction.Quantity).ToString("0")),
+                EscapeCsv(transaction.Amount.ToString("0.##")),
+                EscapeCsv(transaction.Memo ?? string.Empty));
+
+            await writer.WriteLineAsync(line);
+        }
+    }
+
+    /// <summary>
+    /// CSV 셀 값을 안전하게 저장할 수 있도록 이스케이프합니다.
+    /// </summary>
+    /// <param name="value">CSV 셀 값입니다.</param>
+    /// <returns>이스케이프된 CSV 셀 값입니다.</returns>
+    private static string EscapeCsv(string value)
+    {
+        return $"\"{value.Replace("\"", "\"\"")}\"";
+    }
+
+    /// <summary>
     /// 하단 차액 표시 영역을 생성합니다.
     /// </summary>
     /// <returns>생성된 하단 영역입니다.</returns>
@@ -457,14 +565,14 @@ public class MainForm : Form
             Margin = new Padding(0, 4, 0, 4)
         };
 
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var label = new Label
         {
             Text = labelText,
             Dock = DockStyle.Fill,
-            Font = new Font(Font.FontFamily, 10F, FontStyle.Bold),
+            Font = new Font(Font.FontFamily, 9.5F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
@@ -650,8 +758,8 @@ public class MainForm : Form
     private async Task ReloadAsync()
     {
         _isLoading = true;
-        var month = DateOnly.FromDateTime(_monthPicker.Value);
-        var transactions = await _transactionService.GetMonthlyTransactionsAsync(month);
+        var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
+        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
         _transactionsGrid.DataSource = transactions;
         _transactionsGrid.ClearSelection();
         _selectedTransaction = null;
@@ -796,7 +904,9 @@ public class MainForm : Form
         _transactionsGrid.ColumnHeadersDefaultCellStyle.BackColor = _palette.Panel;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.ForeColor = _palette.Foreground;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 12.5F, FontStyle.Bold);
+        _transactionsGrid.ColumnHeadersDefaultCellStyle.Padding = new Padding(4, 6, 4, 6);
         _transactionsGrid.DefaultCellStyle.Font = new Font(Font.FontFamily, 12F, FontStyle.Regular);
+        _transactionsGrid.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         _transactionsGrid.DefaultCellStyle.BackColor = _palette.Card;
         _transactionsGrid.DefaultCellStyle.ForeColor = _palette.Foreground;
         _transactionsGrid.DefaultCellStyle.SelectionBackColor = _palette.Accent;
