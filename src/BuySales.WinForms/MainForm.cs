@@ -11,6 +11,7 @@ namespace BuySales.WinForms;
 /// </summary>
 public class MainForm : Form
 {
+    private readonly IBuySalesDbContextFactory _contextFactory;
     private readonly TransactionService _transactionService;
     private AppTheme _currentTheme;
     private ThemePalette _palette = ThemePalette.FromTheme(AppTheme.Dark);
@@ -39,6 +40,8 @@ public class MainForm : Form
     private readonly Button _deleteButton = new();
     private readonly Button _dailyExportButton = new();
     private readonly Button _monthlyExportButton = new();
+    private readonly Button _backupButton = new();
+    private readonly Button _restoreButton = new();
     private readonly Button _themeButton = new();
 
     /// <summary>
@@ -46,9 +49,9 @@ public class MainForm : Form
     /// </summary>
     public MainForm()
     {
-        var contextFactory = new SqliteBuySalesDbContextFactory();
-        DatabaseInitializer.EnsureCreated(contextFactory);
-        _transactionService = new TransactionService(contextFactory);
+        _contextFactory = new SqliteBuySalesDbContextFactory();
+        DatabaseInitializer.EnsureCreated(_contextFactory);
+        _transactionService = new TransactionService(_contextFactory);
         _currentTheme = ThemeSettings.Load();
 
         InitializeForm();
@@ -100,7 +103,7 @@ public class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 15,
+            RowCount = 17,
             Padding = new Padding(14),
             Margin = new Padding(0, 0, 16, 0)
         };
@@ -113,6 +116,8 @@ public class MainForm : Form
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
@@ -184,6 +189,14 @@ public class MainForm : Form
         _monthlyExportButton.Dock = DockStyle.Fill;
         _monthlyExportButton.Click += async (_, _) => await ExportMonthlyAsync();
 
+        _backupButton.Text = "데이터 백업";
+        _backupButton.Dock = DockStyle.Fill;
+        _backupButton.Click += (_, _) => BackupDatabase();
+
+        _restoreButton.Text = "데이터 복구";
+        _restoreButton.Dock = DockStyle.Fill;
+        _restoreButton.Click += async (_, _) => await RestoreDatabaseAsync();
+
         _themeButton.Dock = DockStyle.Fill;
         _themeButton.Click += (_, _) => ToggleTheme();
 
@@ -200,7 +213,9 @@ public class MainForm : Form
         sidebar.Controls.Add(_deleteButton, 0, 10);
         sidebar.Controls.Add(_dailyExportButton, 0, 11);
         sidebar.Controls.Add(_monthlyExportButton, 0, 12);
-        sidebar.Controls.Add(_themeButton, 0, 14);
+        sidebar.Controls.Add(_backupButton, 0, 13);
+        sidebar.Controls.Add(_restoreButton, 0, 14);
+        sidebar.Controls.Add(_themeButton, 0, 16);
 
         return sidebar;
     }
@@ -450,6 +465,81 @@ public class MainForm : Form
         var selectedMonth = DateOnly.FromDateTime(_monthPicker.Value);
         var transactions = await _transactionService.GetMonthlyTransactionsAsync(selectedMonth);
         await ExportTransactionsAsync(transactions, $"월별_{selectedMonth:yyyyMM}");
+    }
+
+    /// <summary>
+    /// 사용자가 선택한 폴더에 현재 SQLite 데이터베이스 파일을 백업합니다.
+    /// </summary>
+    private void BackupDatabase()
+    {
+        if (!File.Exists(AppPaths.DatabasePath))
+        {
+            MessageBox.Show("백업할 데이터 파일이 없습니다.", "데이터 백업", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "백업 파일을 저장할 폴더를 선택해 주세요.",
+            UseDescriptionForTitle = true
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        var fileName = $"BuySalesNet10_backup_{DateTime.Now:yyyyMMdd_HHmmss}.db";
+        var backupPath = Path.Combine(dialog.SelectedPath, fileName);
+        File.Copy(AppPaths.DatabasePath, backupPath, true);
+
+        MessageBox.Show($"데이터 백업이 완료되었습니다.\r\n\r\n{backupPath}", "데이터 백업", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    /// <summary>
+    /// 사용자가 선택한 SQLite 백업 파일로 현재 데이터베이스를 덮어씁니다.
+    /// </summary>
+    /// <returns>비동기 작업입니다.</returns>
+    private async Task RestoreDatabaseAsync()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "복구할 백업 파일 선택",
+            Filter = "SQLite 백업 파일 (*.db)|*.db|모든 파일 (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        if (Path.GetFullPath(dialog.FileName).Equals(Path.GetFullPath(AppPaths.DatabasePath), StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("현재 사용 중인 데이터 파일은 복구 파일로 선택할 수 없습니다.", "데이터 복구", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var result = MessageBox.Show(
+            "현재 데이터가 선택한 백업 파일로 덮어쓰기 됩니다.\r\n계속 진행할까요?",
+            "데이터 복구 확인",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+
+        if (result != DialogResult.Yes)
+        {
+            return;
+        }
+
+        _transactionsGrid.DataSource = null;
+        _selectedTransaction = null;
+        File.Copy(dialog.FileName, AppPaths.DatabasePath, true);
+        DatabaseInitializer.EnsureCreated(_contextFactory);
+        ClearInput();
+        await ReloadAsync();
+
+        MessageBox.Show("데이터 복구가 완료되었습니다.", "데이터 복구", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     /// <summary>
