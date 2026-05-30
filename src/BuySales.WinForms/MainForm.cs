@@ -149,8 +149,8 @@ public class MainForm : Form
         _saleRadio.TextAlign = ContentAlignment.MiddleCenter;
         _saleRadio.Dock = DockStyle.Fill;
         _saleRadio.MinimumSize = new Size(0, 42);
-        _purchaseRadio.CheckedChanged += (_, _) => ApplyTheme();
-        _saleRadio.CheckedChanged += (_, _) => ApplyTheme();
+        _purchaseRadio.CheckedChanged += async (_, _) => await ChangeKindFilterAsync();
+        _saleRadio.CheckedChanged += async (_, _) => await ChangeKindFilterAsync();
 
         _unitPriceInput.Maximum = 999999999;
         _unitPriceInput.ThousandsSeparator = true;
@@ -828,6 +828,22 @@ public class MainForm : Form
     }
 
     /// <summary>
+    /// 매입 또는 매출 구분이 바뀌면 목록 필터를 다시 적용합니다.
+    /// </summary>
+    /// <returns>비동기 작업입니다.</returns>
+    private async Task ChangeKindFilterAsync()
+    {
+        ApplyTheme();
+
+        if (_isLoading)
+        {
+            return;
+        }
+
+        await ReloadAsync();
+    }
+
+    /// <summary>
     /// 현재 조회 월의 목록과 기간별 합계를 새로 고칩니다.
     /// </summary>
     /// <returns>비동기 작업입니다.</returns>
@@ -835,7 +851,8 @@ public class MainForm : Form
     {
         _isLoading = true;
         var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
-        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
+        var selectedKind = GetSelectedKind();
+        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate, selectedKind);
         _transactionsGrid.DataSource = transactions;
         ClearGridSelection();
         _selectedTransaction = null;
@@ -866,6 +883,15 @@ public class MainForm : Form
         _quantityInput.Value = 1;
         _memoTextBox.Clear();
         UpdateAmount();
+    }
+
+    /// <summary>
+    /// 현재 선택된 매입 또는 매출 구분을 가져옵니다.
+    /// </summary>
+    /// <returns>선택된 거래 구분입니다.</returns>
+    private TransactionKind GetSelectedKind()
+    {
+        return _purchaseRadio.Checked ? TransactionKind.Purchase : TransactionKind.Sale;
     }
 
     /// <summary>
