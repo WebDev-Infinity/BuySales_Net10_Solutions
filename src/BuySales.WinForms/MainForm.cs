@@ -133,13 +133,13 @@ public class MainForm : Form
         _datePicker.ValueChanged += async (_, _) => await ReloadAsync();
 
         _purchaseRadio.Text = "매입";
-        _purchaseRadio.Checked = true;
         _purchaseRadio.Appearance = Appearance.Button;
         _purchaseRadio.TextAlign = ContentAlignment.MiddleCenter;
         _purchaseRadio.Dock = DockStyle.Fill;
         _purchaseRadio.MinimumSize = new Size(0, 42);
 
         _saleRadio.Text = "매출";
+        _saleRadio.Checked = true;
         _saleRadio.Appearance = Appearance.Button;
         _saleRadio.TextAlign = ContentAlignment.MiddleCenter;
         _saleRadio.Dock = DockStyle.Fill;
@@ -221,8 +221,8 @@ public class MainForm : Form
 
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        panel.Controls.Add(_purchaseRadio, 0, 0);
-        panel.Controls.Add(_saleRadio, 1, 0);
+        panel.Controls.Add(_saleRadio, 0, 0);
+        panel.Controls.Add(_purchaseRadio, 1, 0);
 
         return panel;
     }
@@ -772,7 +772,6 @@ public class MainForm : Form
     /// </summary>
     private void ResetInputForNewTransaction()
     {
-        _purchaseRadio.Checked = true;
         _itemNameTextBox.Clear();
         _unitPriceInput.Value = 0;
         _quantityInput.Value = 1;
