@@ -702,7 +702,6 @@ public class MainForm : Form
     private void ClearInput()
     {
         _selectedTransaction = null;
-        _datePicker.Value = DateTime.Today;
         ResetInputForNewTransaction();
         _saveButton.Text = "저장";
         _deleteButton.Enabled = false;
