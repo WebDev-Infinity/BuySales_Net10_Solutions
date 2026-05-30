@@ -103,7 +103,7 @@ public class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 17,
+            RowCount = 14,
             Padding = new Padding(14),
             Margin = new Padding(0, 0, 16, 0)
         };
@@ -116,9 +116,6 @@ public class MainForm : Form
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
@@ -179,6 +176,7 @@ public class MainForm : Form
 
         _deleteButton.Text = "삭제";
         _deleteButton.Dock = DockStyle.Fill;
+        _deleteButton.Enabled = false;
         _deleteButton.Click += async (_, _) => await DeleteAsync();
 
         _dailyExportButton.Text = "일별 엑셀";
@@ -209,16 +207,39 @@ public class MainForm : Form
         sidebar.Controls.Add(CreateLabeledControl("수량", _quantityInput), 0, 5);
         sidebar.Controls.Add(CreateLabeledControl("금액", _amountTextBox), 0, 6);
         sidebar.Controls.Add(CreateLabeledControl("메모", _memoTextBox), 0, 7);
-        sidebar.Controls.Add(_saveButton, 0, 8);
+        sidebar.Controls.Add(CreateButtonRow(_saveButton, _deleteButton), 0, 8);
         sidebar.Controls.Add(_newButton, 0, 9);
-        sidebar.Controls.Add(_deleteButton, 0, 10);
-        sidebar.Controls.Add(_dailyExportButton, 0, 11);
-        sidebar.Controls.Add(_monthlyExportButton, 0, 12);
-        sidebar.Controls.Add(_backupButton, 0, 13);
-        sidebar.Controls.Add(_restoreButton, 0, 14);
-        sidebar.Controls.Add(_themeButton, 0, 16);
+        sidebar.Controls.Add(CreateButtonRow(_dailyExportButton, _monthlyExportButton), 0, 10);
+        sidebar.Controls.Add(CreateButtonRow(_backupButton, _restoreButton), 0, 11);
+        sidebar.Controls.Add(_themeButton, 0, 13);
 
         return sidebar;
+    }
+
+    /// <summary>
+    /// 두 개의 버튼을 같은 행에 절반 너비로 배치한 영역을 생성합니다.
+    /// </summary>
+    /// <param name="leftButton">왼쪽에 배치할 버튼입니다.</param>
+    /// <param name="rightButton">오른쪽에 배치할 버튼입니다.</param>
+    /// <returns>생성된 버튼 행 영역입니다.</returns>
+    private static Control CreateButtonRow(Button leftButton, Button rightButton)
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = Padding.Empty
+        };
+
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        leftButton.Margin = new Padding(0, 3, 4, 3);
+        rightButton.Margin = new Padding(4, 3, 0, 3);
+        panel.Controls.Add(leftButton, 0, 0);
+        panel.Controls.Add(rightButton, 1, 0);
+
+        return panel;
     }
 
     /// <summary>
