@@ -703,6 +703,7 @@ public class MainForm : Form
         UpdateAmount();
         _saveButton.Text = "저장";
         _deleteButton.Enabled = false;
+        ClearGridSelection();
         _itemNameTextBox.Focus();
     }
 
@@ -744,13 +745,22 @@ public class MainForm : Form
         var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
         var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
         _transactionsGrid.DataSource = transactions;
-        _transactionsGrid.ClearSelection();
+        ClearGridSelection();
         _selectedTransaction = null;
         _saveButton.Text = "저장";
         _deleteButton.Enabled = false;
         _isLoading = false;
 
         await UpdateSummariesAsync();
+    }
+
+    /// <summary>
+    /// 거래 목록의 자동 선택을 해제합니다.
+    /// </summary>
+    private void ClearGridSelection()
+    {
+        _transactionsGrid.ClearSelection();
+        _transactionsGrid.CurrentCell = null;
     }
 
     /// <summary>
