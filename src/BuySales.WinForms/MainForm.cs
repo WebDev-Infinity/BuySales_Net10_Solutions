@@ -161,6 +161,7 @@ public class MainForm : Form
 
         _amountTextBox.ReadOnly = true;
         _amountTextBox.TextAlign = HorizontalAlignment.Right;
+        _amountTextBox.TabStop = false;
         ConfigureEnterNavigation();
 
         _saveButton.Text = "저장";
@@ -393,8 +394,7 @@ public class MainForm : Form
     {
         _itemNameTextBox.KeyDown += (_, e) => MoveNextOnEnter(e, _unitPriceInput);
         _unitPriceInput.KeyDown += (_, e) => MoveNextOnEnter(e, _quantityInput);
-        _quantityInput.KeyDown += (_, e) => MoveNextOnEnter(e, _amountTextBox);
-        _amountTextBox.KeyDown += (_, e) => MoveNextOnEnter(e, _memoTextBox);
+        _quantityInput.KeyDown += (_, e) => MoveNextOnEnter(e, _memoTextBox);
         _memoTextBox.KeyDown += async (_, e) => await SaveOnEnterAsync(e);
     }
 
@@ -637,6 +637,13 @@ public class MainForm : Form
         {
             MessageBox.Show("품목을 입력해 주세요.", "확인", MessageBoxButtons.OK, MessageBoxIcon.Information);
             _itemNameTextBox.Focus();
+            return false;
+        }
+
+        if (_unitPriceInput.Value < 1)
+        {
+            MessageBox.Show("단가는 1원 이상 입력해 주세요.", "확인", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _unitPriceInput.Focus();
             return false;
         }
 
