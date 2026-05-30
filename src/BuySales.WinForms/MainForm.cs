@@ -34,7 +34,6 @@ public class MainForm : Form
     private readonly Label _monthlyPurchaseLabel = new();
     private readonly Label _monthlySaleLabel = new();
     private readonly Label _balanceLabel = new();
-    private readonly Label _databasePathLabel = new();
     private readonly Button _saveButton = new();
     private readonly Button _newButton = new();
     private readonly Button _deleteButton = new();
@@ -119,8 +118,8 @@ public class MainForm : Form
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var title = new Label
         {
@@ -200,7 +199,6 @@ public class MainForm : Form
         sidebar.Controls.Add(_deleteButton, 0, 10);
         sidebar.Controls.Add(_dailyExportButton, 0, 11);
         sidebar.Controls.Add(_monthlyExportButton, 0, 12);
-        sidebar.Controls.Add(CreateDatabaseInfo(), 0, 13);
         sidebar.Controls.Add(_themeButton, 0, 14);
 
         return sidebar;
@@ -372,7 +370,7 @@ public class MainForm : Form
         _transactionsGrid.RowHeadersVisible = false;
         _transactionsGrid.RowTemplate.Height = 40;
         _transactionsGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        _transactionsGrid.ColumnHeadersHeight = 42;
+        _transactionsGrid.ColumnHeadersHeight = 56;
         _transactionsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         _transactionsGrid.SelectionChanged += (_, _) => LoadSelectedTransaction();
 
@@ -532,21 +530,6 @@ public class MainForm : Form
         _balanceLabel.TextAlign = ContentAlignment.MiddleRight;
 
         return _balanceLabel;
-    }
-
-    /// <summary>
-    /// 데이터 저장 위치 안내 영역을 생성합니다.
-    /// </summary>
-    /// <returns>생성된 안내 영역입니다.</returns>
-    private Control CreateDatabaseInfo()
-    {
-        _databasePathLabel.Text = $"DB 저장 위치\r\n{AppPaths.DatabasePath}";
-        _databasePathLabel.Dock = DockStyle.Fill;
-        _databasePathLabel.AutoEllipsis = true;
-        _databasePathLabel.Font = new Font(Font.FontFamily, 9F, FontStyle.Regular);
-        _databasePathLabel.TextAlign = ContentAlignment.BottomLeft;
-
-        return _databasePathLabel;
     }
 
     /// <summary>
@@ -903,8 +886,10 @@ public class MainForm : Form
         _transactionsGrid.EnableHeadersVisualStyles = false;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.BackColor = _palette.Panel;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.ForeColor = _palette.Foreground;
-        _transactionsGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 12.5F, FontStyle.Bold);
-        _transactionsGrid.ColumnHeadersDefaultCellStyle.Padding = new Padding(4, 6, 4, 6);
+        _transactionsGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 11.5F, FontStyle.Bold);
+        _transactionsGrid.ColumnHeadersDefaultCellStyle.Padding = Padding.Empty;
+        _transactionsGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+        _transactionsGrid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
         _transactionsGrid.DefaultCellStyle.Font = new Font(Font.FontFamily, 12F, FontStyle.Regular);
         _transactionsGrid.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         _transactionsGrid.DefaultCellStyle.BackColor = _palette.Card;
