@@ -106,20 +106,20 @@ public class MainForm : Form
         };
 
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 88));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
 
         var title = new Label
         {
@@ -548,7 +548,7 @@ public class MainForm : Form
             Margin = new Padding(0, 4, 0, 4)
         };
 
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
         panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var label = new Label
@@ -560,8 +560,8 @@ public class MainForm : Form
         };
 
         control.Dock = DockStyle.Fill;
-        control.Font = new Font(Font.FontFamily, 13F, FontStyle.Regular);
-        control.MinimumSize = new Size(0, 34);
+        control.Font = new Font(Font.FontFamily, 12F, FontStyle.Regular);
+        control.MinimumSize = new Size(0, 38);
         panel.Controls.Add(label, 0, 0);
         panel.Controls.Add(control, 0, 1);
 
