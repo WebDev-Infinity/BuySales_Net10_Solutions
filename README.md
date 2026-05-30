@@ -17,6 +17,23 @@
 - EF Core
 - SQLite
 
+## 최소 사양
+
+- 운영체제: Windows 10 64비트 이상
+- CPU: 64비트 듀얼 코어 이상
+- 메모리: 4GB 이상
+- 저장 공간: 프로그램 실행 파일 기준 약 100MB 이상 여유 공간
+- 화면 해상도: 1366 x 768 이상 권장
+- 데이터 저장소: 로컬 SQLite 파일
+
+단일 실행 파일로 게시한 버전은 .NET 런타임을 포함하므로 별도 설치 없이 실행할 수 있습니다.
+런타임을 포함하지 않는 방식으로 게시하거나 개발 환경에서 실행하는 경우에는 .NET 10 Desktop Runtime이 필요합니다.
+
+- [.NET 10.0 다운로드](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+- [.NET 설치 안내 - Windows](https://learn.microsoft.com/en-us/dotnet/core/install/windows)
+
+설치 시 Windows용 **.NET Desktop Runtime 10.0 x64** 항목을 선택하면 됩니다.
+
 ## 주요 기능
 
 - 로그인 없이 바로 사용
@@ -72,3 +89,9 @@ dotnet publish .\src\BuySales.WinForms\BuySales.WinForms.csproj -c Release
 ```text
 src\BuySales.WinForms\bin\Release\net10.0-windows\win-x64\publish\BuySales.WinForms.exe
 ```
+
+## 라이선스
+
+이 프로젝트는 MIT License로 배포됩니다.
+
+이 프로젝트는 Codex AI를 이용해 개발되었으며, 사용된 주요 외부 패키지는 MIT License 기반의 .NET/EF Core/SQLite 관련 패키지입니다.
