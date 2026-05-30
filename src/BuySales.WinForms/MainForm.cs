@@ -103,7 +103,7 @@ public class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 14,
+            RowCount = 13,
             Padding = new Padding(14),
             Margin = new Padding(0, 0, 16, 0)
         };
@@ -116,7 +116,6 @@ public class MainForm : Form
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-        sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
@@ -199,7 +198,7 @@ public class MainForm : Form
         _themeButton.Click += (_, _) => ToggleTheme();
         ApplyStaticButtonIcons();
 
-        sidebar.Controls.Add(title, 0, 0);
+        sidebar.Controls.Add(CreateTitleRow(title, _newButton), 0, 0);
         sidebar.Controls.Add(CreateLabeledControl("날짜", _datePicker), 0, 1);
         sidebar.Controls.Add(CreateKindSelector(), 0, 2);
         sidebar.Controls.Add(CreateLabeledControl("품목", _itemNameTextBox), 0, 3);
@@ -208,12 +207,37 @@ public class MainForm : Form
         sidebar.Controls.Add(CreateLabeledControl("금액", _amountTextBox), 0, 6);
         sidebar.Controls.Add(CreateLabeledControl("메모", _memoTextBox), 0, 7);
         sidebar.Controls.Add(CreateButtonRow(_saveButton, _deleteButton), 0, 8);
-        sidebar.Controls.Add(_newButton, 0, 9);
-        sidebar.Controls.Add(CreateButtonRow(_dailyExportButton, _monthlyExportButton), 0, 10);
-        sidebar.Controls.Add(CreateButtonRow(_backupButton, _restoreButton), 0, 11);
-        sidebar.Controls.Add(_themeButton, 0, 13);
+        sidebar.Controls.Add(CreateButtonRow(_dailyExportButton, _monthlyExportButton), 0, 9);
+        sidebar.Controls.Add(CreateButtonRow(_backupButton, _restoreButton), 0, 10);
+        sidebar.Controls.Add(_themeButton, 0, 12);
 
         return sidebar;
+    }
+
+    /// <summary>
+    /// 제목과 새 입력 버튼을 같은 행에 절반 너비로 배치한 영역을 생성합니다.
+    /// </summary>
+    /// <param name="title">왼쪽에 배치할 제목 라벨입니다.</param>
+    /// <param name="newButton">오른쪽에 배치할 새 입력 버튼입니다.</param>
+    /// <returns>생성된 제목 행 영역입니다.</returns>
+    private static Control CreateTitleRow(Label title, Button newButton)
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = Padding.Empty
+        };
+
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        title.Margin = new Padding(0, 0, 4, 0);
+        newButton.Margin = new Padding(4, 3, 0, 3);
+        panel.Controls.Add(title, 0, 0);
+        panel.Controls.Add(newButton, 1, 0);
+
+        return panel;
     }
 
     /// <summary>
@@ -668,7 +692,7 @@ public class MainForm : Form
         {
             Text = labelText,
             Dock = DockStyle.Fill,
-            Font = new Font(Font.FontFamily, 9.5F, FontStyle.Bold),
+            Font = new Font(Font.FontFamily, GetInputLabelFontSizeByDpi(), FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
@@ -1009,11 +1033,11 @@ public class MainForm : Form
     private static void SetButtonIcon(Button button, ButtonIconKind kind)
     {
         button.Image?.Dispose();
-        button.Image = ButtonIconFactory.Create(kind, Color.White, 22);
+        button.Image = ButtonIconFactory.Create(kind, Color.White, 18);
         button.ImageAlign = ContentAlignment.MiddleLeft;
         button.TextAlign = ContentAlignment.MiddleCenter;
         button.TextImageRelation = TextImageRelation.ImageBeforeText;
-        button.Padding = new Padding(14, 0, 14, 0);
+        button.Padding = new Padding(6, 0, 6, 0);
     }
 
     /// <summary>
@@ -1051,7 +1075,7 @@ public class MainForm : Form
             button.ForeColor = Color.White;
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
-            button.Font = new Font(Font.FontFamily, 12.5F, FontStyle.Bold);
+            button.Font = new Font(Font.FontFamily, GetButtonFontSizeByDpi(), FontStyle.Bold);
             button.MinimumSize = new Size(0, 42);
         }
 
@@ -1067,6 +1091,24 @@ public class MainForm : Form
         {
             ApplyThemeToControl(child);
         }
+    }
+
+    /// <summary>
+    /// 현재 모니터 DPI 배율에 맞는 버튼 글자 크기를 가져옵니다.
+    /// </summary>
+    /// <returns>DPI 기준으로 조정된 버튼 글자 크기입니다.</returns>
+    private float GetButtonFontSizeByDpi()
+    {
+        return DeviceDpi >= 144 ? 10.5F : 12.5F;
+    }
+
+    /// <summary>
+    /// 현재 모니터 DPI 배율에 맞는 입력 라벨 글자 크기를 가져옵니다.
+    /// </summary>
+    /// <returns>DPI 기준으로 조정된 입력 라벨 글자 크기입니다.</returns>
+    private float GetInputLabelFontSizeByDpi()
+    {
+        return DeviceDpi >= 144 ? 9.5F : 11F;
     }
 
     /// <summary>
