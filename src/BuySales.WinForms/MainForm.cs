@@ -71,6 +71,19 @@ public class MainForm : Form
         MinimumSize = new Size(1220, 780);
         Size = new Size(1380, 860);
         Font = new Font("Malgun Gothic", 12.5F, FontStyle.Regular, GraphicsUnit.Point);
+        ApplyApplicationIcon();
+    }
+
+    /// <summary>
+    /// 실행 파일에 포함된 애플리케이션 아이콘을 현재 화면 아이콘으로 적용합니다.
+    /// </summary>
+    private void ApplyApplicationIcon()
+    {
+        var applicationIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        if (applicationIcon is not null)
+        {
+            Icon = applicationIcon;
+        }
     }
 
     /// <summary>
