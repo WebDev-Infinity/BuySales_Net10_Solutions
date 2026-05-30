@@ -199,6 +199,7 @@ public class MainForm : Form
 
         _themeButton.Dock = DockStyle.Fill;
         _themeButton.Click += (_, _) => ToggleTheme();
+        ApplyStaticButtonIcons();
 
         sidebar.Controls.Add(title, 0, 0);
         sidebar.Controls.Add(CreateLabeledControl("날짜", _datePicker), 0, 1);
@@ -966,12 +967,42 @@ public class MainForm : Form
     }
 
     /// <summary>
+    /// 테마와 무관하게 고정으로 사용하는 버튼 아이콘을 적용합니다.
+    /// </summary>
+    private void ApplyStaticButtonIcons()
+    {
+        SetButtonIcon(_saveButton, ButtonIconKind.Save);
+        SetButtonIcon(_newButton, ButtonIconKind.Add);
+        SetButtonIcon(_deleteButton, ButtonIconKind.Delete);
+        SetButtonIcon(_dailyExportButton, ButtonIconKind.Table);
+        SetButtonIcon(_monthlyExportButton, ButtonIconKind.Table);
+        SetButtonIcon(_backupButton, ButtonIconKind.Backup);
+        SetButtonIcon(_restoreButton, ButtonIconKind.Restore);
+    }
+
+    /// <summary>
+    /// 지정한 버튼에 아이콘 이미지를 적용합니다.
+    /// </summary>
+    /// <param name="button">아이콘을 적용할 버튼입니다.</param>
+    /// <param name="kind">아이콘 종류입니다.</param>
+    private static void SetButtonIcon(Button button, ButtonIconKind kind)
+    {
+        button.Image?.Dispose();
+        button.Image = ButtonIconFactory.Create(kind, Color.White, 22);
+        button.ImageAlign = ContentAlignment.MiddleLeft;
+        button.TextAlign = ContentAlignment.MiddleCenter;
+        button.TextImageRelation = TextImageRelation.ImageBeforeText;
+        button.Padding = new Padding(14, 0, 14, 0);
+    }
+
+    /// <summary>
     /// 현재 테마를 화면 전체에 적용합니다.
     /// </summary>
     private void ApplyTheme()
     {
         _palette = ThemePalette.FromTheme(_currentTheme);
         _themeButton.Text = _currentTheme == AppTheme.Dark ? "라이트 테마" : "다크 테마";
+        SetButtonIcon(_themeButton, _currentTheme == AppTheme.Dark ? ButtonIconKind.Sun : ButtonIconKind.Moon);
         ApplyThemeToControl(this);
         ApplyGridTheme();
         _deleteButton.Enabled = _selectedTransaction is not null;
