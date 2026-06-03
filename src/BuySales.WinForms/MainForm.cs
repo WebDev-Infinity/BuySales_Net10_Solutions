@@ -158,8 +158,8 @@ public class MainForm : Form
         _saleRadio.TextAlign = ContentAlignment.MiddleCenter;
         _saleRadio.Dock = DockStyle.Fill;
         _saleRadio.MinimumSize = new Size(0, 42);
-        _purchaseRadio.CheckedChanged += async (_, _) => await ChangeKindFilterAsync();
-        _saleRadio.CheckedChanged += async (_, _) => await ChangeKindFilterAsync();
+        _purchaseRadio.CheckedChanged += async (_, _) => await ChangeInputKindAsync();
+        _saleRadio.CheckedChanged += async (_, _) => await ChangeInputKindAsync();
 
         _unitPriceInput.Maximum = 999999999;
         _unitPriceInput.ThousandsSeparator = true;
@@ -887,10 +887,10 @@ public class MainForm : Form
     }
 
     /// <summary>
-    /// 매입 또는 매출 구분이 바뀌면 목록 필터를 다시 적용합니다.
+    /// 매입 또는 매출 입력 구분이 바뀌면 선택 버튼 테마를 다시 적용합니다.
     /// </summary>
     /// <returns>비동기 작업입니다.</returns>
-    private async Task ChangeKindFilterAsync()
+    private async Task ChangeInputKindAsync()
     {
         ApplyTheme();
 
@@ -899,19 +899,18 @@ public class MainForm : Form
             return;
         }
 
-        await ReloadAsync();
+        await UpdateSummariesAsync();
     }
 
     /// <summary>
-    /// 현재 조회 월의 목록과 기간별 합계를 새로 고칩니다.
+    /// 현재 조회 날짜의 전체 매입과 매출 목록, 기간별 합계를 새로 고칩니다.
     /// </summary>
     /// <returns>비동기 작업입니다.</returns>
     private async Task ReloadAsync()
     {
         _isLoading = true;
         var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
-        var selectedKind = GetSelectedKind();
-        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate, selectedKind);
+        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
         _transactionsGrid.DataSource = transactions;
         ClearGridSelection();
         _selectedTransaction = null;
@@ -942,15 +941,6 @@ public class MainForm : Form
         _quantityInput.Value = 1;
         _memoTextBox.Clear();
         UpdateAmount();
-    }
-
-    /// <summary>
-    /// 현재 선택된 매입 또는 매출 구분을 가져옵니다.
-    /// </summary>
-    /// <returns>선택된 거래 구분입니다.</returns>
-    private TransactionKind GetSelectedKind()
-    {
-        return _purchaseRadio.Checked ? TransactionKind.Purchase : TransactionKind.Sale;
     }
 
     /// <summary>
@@ -988,7 +978,7 @@ public class MainForm : Form
         SetSummaryLabels(_dailyPurchaseLabel, _dailySaleLabel, daily);
         SetSummaryLabels(_weeklyPurchaseLabel, _weeklySaleLabel, weekly);
         SetSummaryLabels(_monthlyPurchaseLabel, _monthlySaleLabel, monthly);
-        _balanceLabel.Text = $"월 차액: {monthly.Balance:N0}원";
+        _balanceLabel.Text = $"일 매입: {daily.PurchaseTotal:N0}원   일 매출: {daily.SaleTotal:N0}원   일 차액: {daily.Balance:N0}원";
     }
 
     /// <summary>
