@@ -46,6 +46,26 @@ public class BuySaleTransaction
     public decimal Amount { get; set; }
 
     /// <summary>
+    /// 매입 거래일 때 목록에 표시할 매입액을 가져옵니다.
+    /// </summary>
+    public decimal? PurchaseAmount => Kind == TransactionKind.Purchase ? Amount : null;
+
+    /// <summary>
+    /// 매출 거래일 때 목록에 표시할 매출액을 가져옵니다.
+    /// </summary>
+    public decimal? SaleAmount => Kind == TransactionKind.Sale ? Amount : null;
+
+    /// <summary>
+    /// 매입 거래일 때 목록에 표시할 매입액 문자열을 가져옵니다.
+    /// </summary>
+    public string DisplayPurchaseAmount => PurchaseAmount?.ToString("N0") ?? string.Empty;
+
+    /// <summary>
+    /// 매출 거래일 때 목록에 표시할 매출액 문자열을 가져옵니다.
+    /// </summary>
+    public string DisplaySaleAmount => SaleAmount?.ToString("N0") ?? string.Empty;
+
+    /// <summary>
     /// 메모를 가져오거나 설정합니다.
     /// </summary>
     public string? Memo { get; set; }

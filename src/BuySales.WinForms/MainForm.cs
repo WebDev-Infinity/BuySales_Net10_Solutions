@@ -2,6 +2,7 @@ using BuySales.WinForms.Data;
 using BuySales.WinForms.Models;
 using BuySales.WinForms.Services;
 using BuySales.WinForms.Theme;
+using System.Drawing.Drawing2D;
 using System.Text;
 
 namespace BuySales.WinForms;
@@ -26,7 +27,9 @@ public class MainForm : Form
     private readonly NumericUpDown _quantityInput = new();
     private readonly TextBox _amountTextBox = new();
     private readonly TextBox _memoTextBox = new();
+    private readonly DateTimePicker _listDatePicker = new();
     private readonly DateTimePicker _monthPicker = new();
+    private readonly TextBox _searchTextBox = new();
     private readonly DataGridView _transactionsGrid = new();
     private readonly Label _dailyPurchaseLabel = new();
     private readonly Label _dailySaleLabel = new();
@@ -42,7 +45,10 @@ public class MainForm : Form
     private readonly Button _monthlyExportButton = new();
     private readonly Button _backupButton = new();
     private readonly Button _restoreButton = new();
+    private readonly Button _searchButton = new();
+    private readonly Button _clearSearchButton = new();
     private readonly Button _themeButton = new();
+    private List<BuySaleTransaction> _loadedDailyTransactions = new();
 
     /// <summary>
     /// 메인 화면을 생성하고 데이터베이스와 사용자 인터페이스를 초기화합니다.
@@ -68,9 +74,10 @@ public class MainForm : Form
         Text = "매입/매출 금액 관리";
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
-        MinimumSize = new Size(1220, 780);
-        Size = new Size(1380, 860);
-        Font = new Font("Malgun Gothic", 12.5F, FontStyle.Regular, GraphicsUnit.Point);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        MinimumSize = new Size(1280, 800);
+        Size = new Size(1440, 900);
+        Font = new Font("Malgun Gothic", 9.5F, FontStyle.Regular, GraphicsUnit.Point);
         ApplyApplicationIcon();
     }
 
@@ -94,16 +101,425 @@ public class MainForm : Form
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 6,
+            Padding = new Padding(10)
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 220));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 108));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+
+        ConfigureLegacyControls();
+        root.Controls.Add(CreateLegacyToolbar(), 0, 0);
+        root.Controls.Add(CreateLegacyInputPanel(), 0, 1);
+        root.Controls.Add(CreateLegacySearchPanel(), 0, 2);
+        root.Controls.Add(CreateSummaryCards(), 0, 3);
+        root.Controls.Add(CreateGridGroup(), 0, 4);
+        root.Controls.Add(CreateFooter(), 0, 5);
+        Controls.Add(root);
+    }
+
+    /// <summary>
+    /// 기존 StockV2 화면 흐름에 맞춰 재배치할 컨트롤의 속성과 이벤트를 설정합니다.
+    /// </summary>
+    private void ConfigureLegacyControls()
+    {
+        _datePicker.Format = DateTimePickerFormat.Custom;
+        _datePicker.CustomFormat = "yyyy-MM-dd HH:mm";
+
+        _listDatePicker.Format = DateTimePickerFormat.Short;
+        _listDatePicker.ValueChanged += async (_, _) =>
+        {
+            if (_selectedTransaction is null)
+            {
+                _datePicker.Value = _listDatePicker.Value;
+            }
+
+            await ReloadAsync();
+        };
+
+        _monthPicker.Format = DateTimePickerFormat.Custom;
+        _monthPicker.CustomFormat = "yyyy년 MM월";
+        _monthPicker.ShowUpDown = true;
+        _monthPicker.ValueChanged += async (_, _) => await UpdateSummariesAsync();
+
+        _purchaseRadio.Text = "매입";
+        _purchaseRadio.AutoSize = true;
+        _purchaseRadio.Margin = new Padding(12, 8, 0, 0);
+
+        _saleRadio.Text = "매출";
+        _saleRadio.Checked = true;
+        _saleRadio.AutoSize = true;
+        _saleRadio.Margin = new Padding(12, 8, 0, 0);
+        _purchaseRadio.CheckedChanged += async (_, _) => await ChangeInputKindAsync();
+        _saleRadio.CheckedChanged += async (_, _) => await ChangeInputKindAsync();
+
+        _itemNameTextBox.ImeMode = ImeMode.Hangul;
+        _unitPriceInput.Maximum = 999999999;
+        _unitPriceInput.ThousandsSeparator = true;
+        _unitPriceInput.TextAlign = HorizontalAlignment.Right;
+        _unitPriceInput.ValueChanged += (_, _) => UpdateAmount();
+
+        _quantityInput.Maximum = 999999;
+        _quantityInput.DecimalPlaces = 0;
+        _quantityInput.ThousandsSeparator = true;
+        _quantityInput.TextAlign = HorizontalAlignment.Right;
+        _quantityInput.Value = 1;
+        _quantityInput.ValueChanged += (_, _) => UpdateAmount();
+
+        _amountTextBox.ReadOnly = true;
+        _amountTextBox.TextAlign = HorizontalAlignment.Right;
+        _amountTextBox.TabStop = false;
+        _memoTextBox.ImeMode = ImeMode.Hangul;
+        ConfigureEnterNavigation();
+
+        _newButton.Text = "등록";
+        _newButton.Click += (_, _) => ClearInput();
+        _saveButton.Text = "저장";
+        _saveButton.Click += async (_, _) => await SaveAsync();
+        _deleteButton.Text = "삭제";
+        _deleteButton.Enabled = false;
+        _deleteButton.Click += async (_, _) => await DeleteAsync();
+        _dailyExportButton.Text = "일별 엑셀";
+        _dailyExportButton.Click += async (_, _) => await ExportDailyAsync();
+        _monthlyExportButton.Text = "월별 엑셀";
+        _monthlyExportButton.Click += async (_, _) => await ExportMonthlyAsync();
+        _backupButton.Text = "백업";
+        _backupButton.Click += (_, _) => BackupDatabase();
+        _restoreButton.Text = "복구";
+        _restoreButton.Click += async (_, _) => await RestoreDatabaseAsync();
+        _searchButton.Text = "검색";
+        _searchButton.Click += (_, _) => ApplyTransactionFilter();
+        _clearSearchButton.Text = "초기화";
+        _clearSearchButton.Click += (_, _) =>
+        {
+            _searchTextBox.Clear();
+            ApplyTransactionFilter();
+        };
+        _themeButton.Click += (_, _) => ToggleTheme();
+        _searchTextBox.ImeMode = ImeMode.Hangul;
+        _searchTextBox.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode != Keys.Enter)
+            {
+                return;
+            }
+
+            e.SuppressKeyPress = true;
+            ApplyTransactionFilter();
+        };
+
+        ApplyStaticButtonIcons();
+    }
+
+    /// <summary>
+    /// 기존 화면의 상단 명령 버튼 영역을 생성합니다.
+    /// </summary>
+    /// <returns>생성된 상단 툴바입니다.</returns>
+    private Control CreateLegacyToolbar()
+    {
+        var toolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 3, 0, 3),
+            Margin = Padding.Empty
+        };
+
+        ConfigureToolbarButton(_newButton, 104);
+        ConfigureToolbarButton(_saveButton, 104);
+        ConfigureToolbarButton(_deleteButton, 104);
+        ConfigureToolbarButton(_dailyExportButton, 132);
+        ConfigureToolbarButton(_monthlyExportButton, 132);
+        ConfigureToolbarButton(_backupButton, 104);
+        ConfigureToolbarButton(_restoreButton, 104);
+        ConfigureToolbarButton(_themeButton, 148);
+
+        toolbar.Controls.Add(_newButton);
+        toolbar.Controls.Add(_saveButton);
+        toolbar.Controls.Add(_deleteButton);
+        toolbar.Controls.Add(_dailyExportButton);
+        toolbar.Controls.Add(_monthlyExportButton);
+        toolbar.Controls.Add(_backupButton);
+        toolbar.Controls.Add(_restoreButton);
+        toolbar.Controls.Add(_themeButton);
+
+        return toolbar;
+    }
+
+    /// <summary>
+    /// 툴바 버튼의 기본 크기와 여백을 설정합니다.
+    /// </summary>
+    /// <param name="button">설정할 버튼입니다.</param>
+    /// <param name="width">버튼 너비입니다.</param>
+    private static void ConfigureToolbarButton(Button button, int width)
+    {
+        button.Width = width;
+        button.Height = 34;
+        button.Margin = new Padding(0, 1, 8, 1);
+    }
+
+    /// <summary>
+    /// 기존 BuySale 화면의 매입매출정보 그룹 배치를 생성합니다.
+    /// </summary>
+    /// <returns>생성된 입력 그룹입니다.</returns>
+    private Control CreateLegacyInputPanel()
+    {
+        var group = new GroupBox
+        {
+            Text = "매입매출정보",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8, 4, 8, 8),
+            Margin = new Padding(0, 0, 0, 8)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            Margin = Padding.Empty
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 470));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        layout.Controls.Add(CreateLegacyKindGroup(), 0, 0);
+        layout.Controls.Add(CreateLegacyMainFields(), 1, 0);
+        layout.Controls.Add(CreateLegacyMemoFields(), 2, 0);
+        group.Controls.Add(layout);
+
+        return group;
+    }
+
+    /// <summary>
+    /// 매출과 매입 구분 라디오 버튼 그룹을 생성합니다.
+    /// </summary>
+    /// <returns>생성된 구분 그룹입니다.</returns>
+    private Control CreateLegacyKindGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "구분",
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 8, 12, 8)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            ColumnCount = 1,
+            Padding = new Padding(8, 14, 8, 8)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        layout.Controls.Add(_saleRadio, 0, 0);
+        layout.Controls.Add(_purchaseRadio, 0, 1);
+        group.Controls.Add(layout);
+
+        return group;
+    }
+
+    /// <summary>
+    /// 날짜, 품목, 수량, 단가, 금액 입력 영역을 생성합니다.
+    /// </summary>
+    /// <returns>생성된 주요 입력 영역입니다.</returns>
+    private Control CreateLegacyMainFields()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 5,
+            Margin = new Padding(0, 4, 12, 4)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
+
+        for (var row = 0; row < 5; row++)
+        {
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+        }
+
+        AddLegacyInputRow(layout, 0, "날짜/시간", _datePicker, string.Empty);
+        AddLegacyInputRow(layout, 1, "품목", _itemNameTextBox, string.Empty);
+        AddLegacyInputRow(layout, 2, "수량", _quantityInput, "개");
+        AddLegacyInputRow(layout, 3, "단가", _unitPriceInput, "원");
+        AddLegacyInputRow(layout, 4, "금액", _amountTextBox, "원");
+
+        return layout;
+    }
+
+    /// <summary>
+    /// 메모 입력 영역을 생성합니다.
+    /// </summary>
+    /// <returns>생성된 메모 영역입니다.</returns>
+    private Control CreateLegacyMemoFields()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 1,
-            Padding = new Padding(16)
+            Margin = new Padding(0, 4, 0, 4)
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 390));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        root.Controls.Add(CreateSidebar(), 0, 0);
-        root.Controls.Add(CreateContentArea(), 1, 0);
-        Controls.Add(root);
+        _memoTextBox.Multiline = true;
+        _memoTextBox.ScrollBars = ScrollBars.Vertical;
+        _memoTextBox.Dock = DockStyle.Fill;
+
+        layout.Controls.Add(CreateLegacyLabel("메모", ContentAlignment.TopRight), 0, 0);
+        layout.Controls.Add(_memoTextBox, 1, 0);
+
+        return layout;
+    }
+
+    /// <summary>
+    /// 기존 화면 스타일의 한 줄 입력 행을 추가합니다.
+    /// </summary>
+    /// <param name="layout">행을 추가할 레이아웃입니다.</param>
+    /// <param name="row">추가할 행 번호입니다.</param>
+    /// <param name="labelText">라벨 텍스트입니다.</param>
+    /// <param name="control">입력 컨트롤입니다.</param>
+    /// <param name="unitText">단위 텍스트입니다.</param>
+    private void AddLegacyInputRow(TableLayoutPanel layout, int row, string labelText, Control control, string unitText)
+    {
+        control.Dock = DockStyle.Fill;
+        control.Margin = new Padding(0, 4, 8, 4);
+        control.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Regular);
+        control.MinimumSize = new Size(0, 28);
+
+        layout.Controls.Add(CreateLegacyLabel(labelText, ContentAlignment.MiddleRight), 0, row);
+        layout.Controls.Add(control, 1, row);
+        layout.Controls.Add(CreateLegacyLabel(unitText, ContentAlignment.MiddleLeft), 2, row);
+    }
+
+    /// <summary>
+    /// 기존 화면 스타일의 라벨을 생성합니다.
+    /// </summary>
+    /// <param name="text">라벨 텍스트입니다.</param>
+    /// <param name="alignment">텍스트 정렬 방식입니다.</param>
+    /// <returns>생성된 라벨입니다.</returns>
+    private Label CreateLegacyLabel(string text, ContentAlignment alignment)
+    {
+        return new Label
+        {
+            Text = text,
+            Dock = DockStyle.Fill,
+            TextAlign = alignment,
+            Font = new Font(Font.FontFamily, 9.5F, FontStyle.Bold),
+            Margin = new Padding(0, 4, 8, 4)
+        };
+    }
+
+    /// <summary>
+    /// 기존 화면의 조회 날짜와 검색어 입력 영역을 생성합니다.
+    /// </summary>
+    /// <returns>생성된 조회 영역입니다.</returns>
+    private Control CreateLegacySearchPanel()
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 5,
+            RowCount = 1,
+            Padding = new Padding(0, 2, 0, 6),
+            Margin = Padding.Empty
+        };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 118));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 118));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 460));
+
+        _listDatePicker.Dock = DockStyle.Top;
+        _searchTextBox.Dock = DockStyle.Top;
+        _listDatePicker.Margin = new Padding(0, 12, 4, 0);
+        _searchTextBox.Margin = new Padding(0, 12, 4, 0);
+        ConfigureSearchButton(_searchButton);
+        ConfigureSearchButton(_clearSearchButton);
+
+        panel.Controls.Add(_listDatePicker, 0, 0);
+        panel.Controls.Add(_searchTextBox, 1, 0);
+        panel.Controls.Add(_searchButton, 2, 0);
+        panel.Controls.Add(_clearSearchButton, 3, 0);
+        panel.Controls.Add(CreateSearchMonthControl(), 4, 0);
+
+        return panel;
+    }
+
+    /// <summary>
+    /// 검색 줄에 들어가는 월별 합계 선택 영역을 인라인으로 생성합니다.
+    /// </summary>
+    /// <returns>생성된 월 선택 영역입니다.</returns>
+    private Control CreateSearchMonthControl()
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            ColumnCount = 2,
+            RowCount = 1,
+            Height = 30,
+            Margin = new Padding(8, 12, 0, 0)
+        };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var label = new Label
+        {
+            Text = "월별 합계",
+            Dock = DockStyle.Fill,
+            Font = new Font(Font.FontFamily, 9.5F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleRight,
+            Margin = new Padding(0, 0, 8, 0)
+        };
+
+        _monthPicker.Dock = DockStyle.Fill;
+        _monthPicker.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Regular);
+        _monthPicker.Margin = Padding.Empty;
+        panel.Controls.Add(label, 0, 0);
+        panel.Controls.Add(_monthPicker, 1, 0);
+
+        return panel;
+    }
+
+    /// <summary>
+    /// 검색 영역 버튼의 기본 배치를 설정합니다.
+    /// </summary>
+    /// <param name="button">설정할 버튼입니다.</param>
+    private static void ConfigureSearchButton(Button button)
+    {
+        button.Dock = DockStyle.Top;
+        button.Margin = new Padding(4, 12, 0, 0);
+        button.MinimumSize = new Size(0, 0);
+        button.Height = 30;
+    }
+
+    /// <summary>
+    /// 거래 목록 그리드를 기존 화면처럼 그룹 박스 안에 배치합니다.
+    /// </summary>
+    /// <returns>생성된 목록 그룹입니다.</returns>
+    private Control CreateGridGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "매입매출목록",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8, 4, 8, 8),
+            Margin = new Padding(0, 0, 0, 6)
+        };
+
+        group.Controls.Add(CreateGrid());
+        return group;
     }
 
     /// <summary>
@@ -373,7 +789,7 @@ public class MainForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 3,
             RowCount = 1,
-            Margin = new Padding(0, 4, 0, 12)
+            Margin = new Padding(0, 0, 0, 4)
         };
 
         cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
@@ -413,7 +829,7 @@ public class MainForm : Form
         {
             Text = title,
             Dock = DockStyle.Fill,
-            Font = new Font(Font.FontFamily, 13.5F, FontStyle.Bold),
+            Font = new Font(Font.FontFamily, 10.5F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
@@ -443,9 +859,9 @@ public class MainForm : Form
         _transactionsGrid.MultiSelect = false;
         _transactionsGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         _transactionsGrid.RowHeadersVisible = false;
-        _transactionsGrid.RowTemplate.Height = 40;
+        _transactionsGrid.RowTemplate.Height = 32;
         _transactionsGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        _transactionsGrid.ColumnHeadersHeight = 56;
+        _transactionsGrid.ColumnHeadersHeight = 38;
         _transactionsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         _transactionsGrid.CellClick += (_, _) => LoadSelectedTransaction();
         _transactionsGrid.DataBindingComplete += (_, _) => ClearGridSelection();
@@ -453,22 +869,23 @@ public class MainForm : Form
         _transactionsGrid.Columns.Add(CreateTextColumn("TransactionDate", "날짜", 110));
         _transactionsGrid.Columns.Add(CreateTextColumn("DisplayKind", "구분", 80));
         _transactionsGrid.Columns.Add(CreateTextColumn("ItemName", "품목", 180));
-        _transactionsGrid.Columns.Add(CreateTextColumn("UnitPrice", "단가", 110, "N0"));
         _transactionsGrid.Columns.Add(CreateTextColumn("Quantity", "수량", 90, "N0"));
-        _transactionsGrid.Columns.Add(CreateTextColumn("Amount", "금액", 130, "N0"));
+        _transactionsGrid.Columns.Add(CreateTextColumn("UnitPrice", "단가", 110, "N0"));
+        _transactionsGrid.Columns.Add(CreateTextColumn("DisplayPurchaseAmount", "매입액", 130));
+        _transactionsGrid.Columns.Add(CreateTextColumn("DisplaySaleAmount", "매출액", 130));
         _transactionsGrid.Columns.Add(CreateTextColumn("Memo", "메모", 180));
 
         return _transactionsGrid;
     }
 
     /// <summary>
-    /// Enter 키로 입력 컨트롤을 순서대로 이동하고 메모에서 저장되도록 설정합니다.
+    /// Enter 키로 품목, 수량, 단가 순서로 이동하고 단가 입력 후 저장되도록 설정합니다.
     /// </summary>
     private void ConfigureEnterNavigation()
     {
-        _itemNameTextBox.KeyDown += (_, e) => MoveNextOnEnter(e, _unitPriceInput);
-        _unitPriceInput.KeyDown += (_, e) => MoveNextOnEnter(e, _quantityInput);
-        _quantityInput.KeyDown += (_, e) => MoveNextOnEnter(e, _memoTextBox);
+        _itemNameTextBox.KeyDown += (_, e) => MoveNextOnEnter(e, _quantityInput);
+        _quantityInput.KeyDown += (_, e) => MoveNextOnEnter(e, _unitPriceInput);
+        _unitPriceInput.KeyDown += async (_, e) => await SaveOnEnterAsync(e);
         _memoTextBox.KeyDown += async (_, e) => await SaveOnEnterAsync(e);
     }
 
@@ -501,6 +918,7 @@ public class MainForm : Form
         }
 
         e.SuppressKeyPress = true;
+        UpdateAmount();
         await SaveAsync();
     }
 
@@ -642,7 +1060,7 @@ public class MainForm : Form
     private static async Task WriteTransactionsCsvAsync(string filePath, IEnumerable<BuySaleTransaction> transactions)
     {
         await using var writer = new StreamWriter(filePath, false, new UTF8Encoding(true));
-        await writer.WriteLineAsync("날짜,구분,품목,단가,수량,금액,메모");
+        await writer.WriteLineAsync("날짜,구분,품목,단가,수량,매입액,매출액,메모");
 
         foreach (var transaction in transactions)
         {
@@ -652,7 +1070,8 @@ public class MainForm : Form
                 EscapeCsv(transaction.ItemName),
                 EscapeCsv(transaction.UnitPrice.ToString("0.##")),
                 EscapeCsv(decimal.Truncate(transaction.Quantity).ToString("0")),
-                EscapeCsv(transaction.Amount.ToString("0.##")),
+                EscapeCsv(transaction.PurchaseAmount?.ToString("0.##") ?? string.Empty),
+                EscapeCsv(transaction.SaleAmount?.ToString("0.##") ?? string.Empty),
                 EscapeCsv(transaction.Memo ?? string.Empty));
 
             await writer.WriteLineAsync(line);
@@ -676,7 +1095,7 @@ public class MainForm : Form
     private Control CreateFooter()
     {
         _balanceLabel.Dock = DockStyle.Fill;
-        _balanceLabel.Font = new Font(Font.FontFamily, 17F, FontStyle.Bold);
+        _balanceLabel.Font = new Font(Font.FontFamily, 13F, FontStyle.Bold);
         _balanceLabel.TextAlign = ContentAlignment.MiddleRight;
 
         return _balanceLabel;
@@ -698,7 +1117,7 @@ public class MainForm : Form
             Margin = new Padding(0, 4, 0, 4)
         };
 
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
         panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var label = new Label
@@ -710,8 +1129,8 @@ public class MainForm : Form
         };
 
         control.Dock = DockStyle.Fill;
-        control.Font = new Font(Font.FontFamily, 12F, FontStyle.Regular);
-        control.MinimumSize = new Size(0, 38);
+        control.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Regular);
+        control.MinimumSize = new Size(0, 28);
         panel.Controls.Add(label, 0, 0);
         panel.Controls.Add(control, 0, 1);
 
@@ -740,7 +1159,7 @@ public class MainForm : Form
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Format = format,
-                Alignment = propertyName is "UnitPrice" or "Quantity" or "Amount"
+                Alignment = propertyName is "UnitPrice" or "Quantity" or "Amount" or "DisplayPurchaseAmount" or "DisplaySaleAmount"
                     ? DataGridViewContentAlignment.MiddleRight
                     : DataGridViewContentAlignment.MiddleLeft
             }
@@ -812,12 +1231,15 @@ public class MainForm : Form
     /// <returns>비동기 작업입니다.</returns>
     private async Task SaveAsync()
     {
+        UpdateAmount();
+
         if (!ValidateInput())
         {
             return;
         }
 
         await _transactionService.SaveAsync(BuildTransaction());
+        _listDatePicker.Value = _datePicker.Value;
         ClearInput();
         await ReloadAsync();
     }
@@ -909,11 +1331,16 @@ public class MainForm : Form
     private async Task ReloadAsync()
     {
         _isLoading = true;
-        var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
-        var transactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
-        _transactionsGrid.DataSource = transactions;
+        var selectedDate = DateOnly.FromDateTime(_listDatePicker.Value);
+        _loadedDailyTransactions = await _transactionService.GetDailyTransactionsAsync(selectedDate);
+        ApplyTransactionFilter();
         ClearGridSelection();
         _selectedTransaction = null;
+        if (_datePicker.Value.Date != _listDatePicker.Value.Date)
+        {
+            _datePicker.Value = _listDatePicker.Value;
+        }
+
         ResetInputForNewTransaction();
         _saveButton.Text = "저장";
         _deleteButton.Enabled = false;
@@ -963,7 +1390,7 @@ public class MainForm : Form
     /// <returns>비동기 작업입니다.</returns>
     private async Task UpdateSummariesAsync()
     {
-        var selectedDate = DateOnly.FromDateTime(_datePicker.Value);
+        var selectedDate = DateOnly.FromDateTime(_listDatePicker.Value);
         var dayStart = selectedDate;
         var dayEnd = selectedDate;
         var weekStart = GetWeekStart(selectedDate);
@@ -979,6 +1406,25 @@ public class MainForm : Form
         SetSummaryLabels(_weeklyPurchaseLabel, _weeklySaleLabel, weekly);
         SetSummaryLabels(_monthlyPurchaseLabel, _monthlySaleLabel, monthly);
         _balanceLabel.Text = $"일 매입: {daily.PurchaseTotal:N0}원   일 매출: {daily.SaleTotal:N0}원   일 차액: {daily.Balance:N0}원";
+    }
+
+    /// <summary>
+    /// 현재 조회된 일자 목록에 검색어 필터를 적용합니다.
+    /// </summary>
+    private void ApplyTransactionFilter()
+    {
+        var query = _searchTextBox.Text.Trim();
+        var transactions = string.IsNullOrWhiteSpace(query)
+            ? _loadedDailyTransactions
+            : _loadedDailyTransactions
+                .Where(x =>
+                    x.ItemName.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    x.DisplayKind.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+                    (x.Memo?.Contains(query, StringComparison.CurrentCultureIgnoreCase) ?? false))
+                .ToList();
+
+        _transactionsGrid.DataSource = transactions;
+        ClearGridSelection();
     }
 
     /// <summary>
@@ -1026,6 +1472,8 @@ public class MainForm : Form
         SetButtonIcon(_monthlyExportButton, ButtonIconKind.Table);
         SetButtonIcon(_backupButton, ButtonIconKind.Backup);
         SetButtonIcon(_restoreButton, ButtonIconKind.Restore);
+        SetButtonIcon(_searchButton, ButtonIconKind.Search);
+        SetButtonIcon(_clearSearchButton, ButtonIconKind.Refresh);
     }
 
     /// <summary>
@@ -1074,12 +1522,15 @@ public class MainForm : Form
 
         if (control is Button button)
         {
-            button.BackColor = _palette.Accent;
+            button.BackColor = GetButtonBackColor(button);
             button.ForeColor = Color.White;
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = GetButtonHoverColor(button);
+            button.FlatAppearance.MouseDownBackColor = GetButtonPressedColor(button);
             button.Font = new Font(Font.FontFamily, GetButtonFontSizeByDpi(), FontStyle.Bold);
-            button.MinimumSize = new Size(0, 42);
+            button.MinimumSize = new Size(0, 30);
+            ApplyRoundedButton(button);
         }
 
         if (control is RadioButton radioButton)
@@ -1087,7 +1538,7 @@ public class MainForm : Form
             radioButton.BackColor = radioButton.Checked ? _palette.Accent : _palette.Card;
             radioButton.ForeColor = radioButton.Checked ? Color.White : _palette.Foreground;
             radioButton.FlatStyle = FlatStyle.Flat;
-            radioButton.Font = new Font(Font.FontFamily, 12.5F, FontStyle.Bold);
+            radioButton.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Bold);
         }
 
         foreach (Control child in control.Controls)
@@ -1097,12 +1548,149 @@ public class MainForm : Form
     }
 
     /// <summary>
+    /// 버튼 모서리를 살짝 둥글게 처리합니다.
+    /// </summary>
+    /// <param name="button">둥근 모서리를 적용할 버튼입니다.</param>
+    private static void ApplyRoundedButton(Button button)
+    {
+        UpdateRoundedButtonRegion(button);
+        button.Resize -= RoundedButtonResize;
+        button.Resize += RoundedButtonResize;
+    }
+
+    /// <summary>
+    /// 버튼 크기가 바뀔 때 둥근 모서리 영역을 다시 계산합니다.
+    /// </summary>
+    /// <param name="sender">크기가 바뀐 버튼입니다.</param>
+    /// <param name="e">이벤트 정보입니다.</param>
+    private static void RoundedButtonResize(object? sender, EventArgs e)
+    {
+        if (sender is Button button)
+        {
+            UpdateRoundedButtonRegion(button);
+        }
+    }
+
+    /// <summary>
+    /// 현재 버튼 크기에 맞춰 둥근 사각형 영역을 적용합니다.
+    /// </summary>
+    /// <param name="button">영역을 적용할 버튼입니다.</param>
+    private static void UpdateRoundedButtonRegion(Button button)
+    {
+        if (button.Width <= 0 || button.Height <= 0)
+        {
+            return;
+        }
+
+        button.Region?.Dispose();
+        using var path = CreateRoundedRectanglePath(new Rectangle(0, 0, button.Width, button.Height), 6);
+        button.Region = new Region(path);
+    }
+
+    /// <summary>
+    /// 둥근 사각형 그래픽 경로를 생성합니다.
+    /// </summary>
+    /// <param name="bounds">사각형 영역입니다.</param>
+    /// <param name="radius">모서리 반지름입니다.</param>
+    /// <returns>생성된 그래픽 경로입니다.</returns>
+    private static GraphicsPath CreateRoundedRectanglePath(Rectangle bounds, int radius)
+    {
+        var diameter = radius * 2;
+        var path = new GraphicsPath();
+        path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+
+        return path;
+    }
+
+    /// <summary>
+    /// 버튼의 역할과 현재 테마에 맞는 배경색을 가져옵니다.
+    /// </summary>
+    /// <param name="button">색상을 결정할 버튼입니다.</param>
+    /// <returns>버튼 배경색입니다.</returns>
+    private Color GetButtonBackColor(Button button)
+    {
+        if (button == _deleteButton)
+        {
+            return _currentTheme == AppTheme.Light
+                ? Color.FromArgb(220, 88, 88)
+                : Color.FromArgb(190, 84, 84);
+        }
+
+        if (button == _saveButton || button == _searchButton)
+        {
+            return _currentTheme == AppTheme.Light
+                ? Color.FromArgb(74, 122, 201)
+                : Color.FromArgb(56, 139, 189);
+        }
+
+        return _currentTheme == AppTheme.Light
+            ? Color.FromArgb(100, 116, 139)
+            : Color.FromArgb(71, 85, 105);
+    }
+
+    /// <summary>
+    /// 버튼에 마우스를 올렸을 때 사용할 배경색을 가져옵니다.
+    /// </summary>
+    /// <param name="button">색상을 결정할 버튼입니다.</param>
+    /// <returns>마우스 오버 배경색입니다.</returns>
+    private Color GetButtonHoverColor(Button button)
+    {
+        if (button == _deleteButton)
+        {
+            return _currentTheme == AppTheme.Light
+                ? Color.FromArgb(200, 72, 72)
+                : Color.FromArgb(170, 68, 68);
+        }
+
+        if (button == _saveButton || button == _searchButton)
+        {
+            return _currentTheme == AppTheme.Light
+                ? Color.FromArgb(60, 104, 180)
+                : Color.FromArgb(45, 122, 169);
+        }
+
+        return _currentTheme == AppTheme.Light
+            ? Color.FromArgb(71, 85, 105)
+            : Color.FromArgb(51, 65, 85);
+    }
+
+    /// <summary>
+    /// 버튼을 눌렀을 때 사용할 배경색을 가져옵니다.
+    /// </summary>
+    /// <param name="button">색상을 결정할 버튼입니다.</param>
+    /// <returns>마우스 다운 배경색입니다.</returns>
+    private Color GetButtonPressedColor(Button button)
+    {
+        if (button == _deleteButton)
+        {
+            return _currentTheme == AppTheme.Light
+                ? Color.FromArgb(180, 56, 56)
+                : Color.FromArgb(150, 56, 56);
+        }
+
+        if (button == _saveButton || button == _searchButton)
+        {
+            return _currentTheme == AppTheme.Light
+                ? Color.FromArgb(48, 88, 158)
+                : Color.FromArgb(35, 105, 150);
+        }
+
+        return _currentTheme == AppTheme.Light
+            ? Color.FromArgb(51, 65, 85)
+            : Color.FromArgb(30, 41, 59);
+    }
+
+    /// <summary>
     /// 현재 모니터 DPI 배율에 맞는 버튼 글자 크기를 가져옵니다.
     /// </summary>
     /// <returns>DPI 기준으로 조정된 버튼 글자 크기입니다.</returns>
     private float GetButtonFontSizeByDpi()
     {
-        return DeviceDpi >= 144 ? 10.5F : 12.5F;
+        return DeviceDpi >= 144 ? 8.5F : 9.5F;
     }
 
     /// <summary>
@@ -1111,7 +1699,7 @@ public class MainForm : Form
     /// <returns>DPI 기준으로 조정된 입력 라벨 글자 크기입니다.</returns>
     private float GetInputLabelFontSizeByDpi()
     {
-        return DeviceDpi >= 144 ? 9.5F : 11F;
+        return DeviceDpi >= 144 ? 8.5F : 9.5F;
     }
 
     /// <summary>
@@ -1124,11 +1712,11 @@ public class MainForm : Form
         _transactionsGrid.EnableHeadersVisualStyles = false;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.BackColor = _palette.Panel;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.ForeColor = _palette.Foreground;
-        _transactionsGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 11.5F, FontStyle.Bold);
+        _transactionsGrid.ColumnHeadersDefaultCellStyle.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Bold);
         _transactionsGrid.ColumnHeadersDefaultCellStyle.Padding = Padding.Empty;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         _transactionsGrid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
-        _transactionsGrid.DefaultCellStyle.Font = new Font(Font.FontFamily, 12F, FontStyle.Regular);
+        _transactionsGrid.DefaultCellStyle.Font = new Font(Font.FontFamily, 9.5F, FontStyle.Regular);
         _transactionsGrid.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         _transactionsGrid.DefaultCellStyle.BackColor = _palette.Card;
         _transactionsGrid.DefaultCellStyle.ForeColor = _palette.Foreground;

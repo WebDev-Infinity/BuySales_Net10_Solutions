@@ -48,6 +48,12 @@ public static class ButtonIconFactory
             case ButtonIconKind.Restore:
                 DrawRestore(graphics, pen, size);
                 break;
+            case ButtonIconKind.Search:
+                DrawSearch(graphics, pen, size);
+                break;
+            case ButtonIconKind.Refresh:
+                DrawRefresh(graphics, pen, size);
+                break;
             case ButtonIconKind.Sun:
                 DrawSun(graphics, pen, size);
                 break;
@@ -168,6 +174,33 @@ public static class ButtonIconFactory
         graphics.DrawLine(pen, 5 * unit, 6.5F * unit, 5 * unit, 18 * unit);
         graphics.DrawLine(pen, 19 * unit, 6.5F * unit, 19 * unit, 18 * unit);
         graphics.DrawArc(pen, 5 * unit, 15.5F * unit, 14 * unit, 5 * unit, 0, 180);
+    }
+
+    /// <summary>
+    /// 검색 아이콘을 그립니다.
+    /// </summary>
+    /// <param name="graphics">그래픽 컨텍스트입니다.</param>
+    /// <param name="pen">외곽선 펜입니다.</param>
+    /// <param name="size">아이콘 크기입니다.</param>
+    private static void DrawSearch(Graphics graphics, Pen pen, int size)
+    {
+        var unit = size / 24F;
+        graphics.DrawEllipse(pen, 5 * unit, 5 * unit, 10 * unit, 10 * unit);
+        graphics.DrawLine(pen, 14 * unit, 14 * unit, 20 * unit, 20 * unit);
+    }
+
+    /// <summary>
+    /// 새로 고침 아이콘을 그립니다.
+    /// </summary>
+    /// <param name="graphics">그래픽 컨텍스트입니다.</param>
+    /// <param name="pen">외곽선 펜입니다.</param>
+    /// <param name="size">아이콘 크기입니다.</param>
+    private static void DrawRefresh(Graphics graphics, Pen pen, int size)
+    {
+        var unit = size / 24F;
+        graphics.DrawArc(pen, 5 * unit, 5 * unit, 14 * unit, 14 * unit, 35, 255);
+        graphics.DrawLine(pen, 16 * unit, 4 * unit, 20 * unit, 5 * unit);
+        graphics.DrawLine(pen, 20 * unit, 5 * unit, 18 * unit, 9 * unit);
     }
 
     /// <summary>

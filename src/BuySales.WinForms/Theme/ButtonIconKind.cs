@@ -36,6 +36,16 @@ public enum ButtonIconKind
     Restore,
 
     /// <summary>
+    /// 검색 아이콘입니다.
+    /// </summary>
+    Search,
+
+    /// <summary>
+    /// 새로 고침 아이콘입니다.
+    /// </summary>
+    Refresh,
+
+    /// <summary>
     /// 밝은 테마 아이콘입니다.
     /// </summary>
     Sun,
